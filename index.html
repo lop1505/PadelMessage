@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Padel Generator</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    /* Verhindert Pull-to-Refresh auf mobilen Geräten */
+    body { overscroll-behavior-y: contain; -webkit-tap-highlight-color: transparent; }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-800 antialiased">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    // --- Icons als inline SVGs ---
+    const IconCalendar = ({ size = 16 }) => <svg width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>;
+    const IconClock = ({ size = 16 }) => <svg width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>;
+    const IconTag = ({ size = 16 }) => <svg width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>;
+    const IconGlobe = ({ size = 16 }) => <svg width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>;
+    const IconUsers = ({ size = 16 }) => <svg width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>;
+    const IconPlus = ({ size = 14 }) => <svg width={size} height={size} fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>;
+    const IconTrash = ({ size = 20 }) => <svg width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>;
+    const IconInfo = ({ size = 16 }) => <svg width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>;
+    const IconCopy = ({ size = 22 }) => <svg width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>;
+    const IconCheck = ({ size = 22 }) => <svg width={size} height={size} fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>;
+    const IconX = ({ size = 20 }) => <svg width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>;
+
+    // --- Konfiguration ---
+    const CATEGORIES = ["1", "2", "3", "4"];
+    const MAX_PLAYERS = 4;
+
+    const CowboyLogo = () => (
+      <svg viewBox="0 0 64 64" className="w-20 h-20 mx-auto mb-4 drop-shadow-lg" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M32 12 C20 12 18 26 18 30 L46 30 C46 26 44 12 32 12 Z" fill="#004b87" />
+        <path d="M18 28 L46 28 L46 32 L18 32 Z" fill="#009543" />
+        <path d="M6 32 C6 32 14 38 32 38 C50 38 58 32 58 32 C58 36 48 42 32 42 C16 42 6 36 6 32 Z" fill="#004b87" />
+        <circle cx="32" cy="30" r="3" fill="#ffffff" />
+      </svg>
+    );
+
+    const BVBLogo = () => (
+      <svg viewBox="0 0 64 64" className="w-20 h-20 mx-auto mb-4 drop-shadow-md" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="32" cy="32" r="28" fill="#FDE100" stroke="#000000" strokeWidth="3" />
+        <circle cx="32" cy="32" r="24" stroke="#000000" strokeWidth="1" opacity="0.2" />
+        <text x="32" y="38" fontSize="22" fontWeight="900" textAnchor="middle" fill="#000000" style={{fontFamily: 'system-ui, sans-serif', letterSpacing: '-1px'}}>BVB</text>
+        <text x="32" y="52" fontSize="12" fontWeight="900" textAnchor="middle" fill="#000000" style={{fontFamily: 'system-ui, sans-serif'}}>09</text>
+      </svg>
+    );
+
+    function App() {
+      const [theme, setTheme] = useState('FCG');
+      const [date, setDate] = useState('');
+      const [timeFrom, setTimeFrom] = useState('16:00');
+      const [timeTo, setTimeTo] = useState('18:00');
+      const [category, setCategory] = useState('2');
+      const [bookingLink, setBookingLink] = useState('');
+      const [players, setPlayers] = useState([
+        { name: '', status: 'M' },
+        { name: '', status: 'M' },
+        { name: '', status: 'M' }
+      ]);
+      const [copied, setCopied] = useState(false);
+      const [activeInfo, setActiveInfo] = useState(null);
+
+      useEffect(() => {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        setDate(tomorrow.toISOString().split('T')[0]);
+      }, []);
+
+      const formatMessageDate = (dateStr) => {
+        if (!dateStr) return "";
+        const d = new Date(dateStr);
+        const days = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
+        const dayName = days[d.getDay()];
+        const dd = String(d.getDate()).padStart(2, '0');
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const yy = String(d.getFullYear()).slice(-2);
+        return `${dayName}, ${dd}.${mm}.${yy}`;
+      };
+
+      const updatePlayerName = (index, value) => {
+        const newPlayers = [...players];
+        newPlayers[index].name = value;
+        setPlayers(newPlayers);
+      };
+
+      const togglePlayerStatus = (index) => {
+        const newPlayers = [...players];
+        newPlayers[index].status = newPlayers[index].status === 'M' ? 'G' : 'M';
+        setPlayers(newPlayers);
+      };
+
+      const addPlayer = () => {
+        if (players.length < MAX_PLAYERS) {
+          setPlayers([...players, { name: '', status: 'M' }]);
+        }
+      };
+
+      const removePlayer = (index) => {
+        setPlayers(players.filter((_, i) => i !== index));
+      };
+
+      const filledPlayers = players.filter(p => p.name.trim() !== '');
+      const spotsLeft = Math.max(0, MAX_PLAYERS - players.length);
+      
+      const generateMessage = () => {
+        const lines = [
+          `🎾 Mitspieler gesucht!`,
+          `📅 ${formatMessageDate(date)}`,
+          `⏱ ${timeFrom}-${timeTo}`,
+          `🏷 Kategorie: ${category}`,
+          `🌍 ${bookingLink || 'Link folgt...'}`,
+          ``
+        ];
+
+        players.forEach(p => {
+            if (p.name.trim()) {
+                 lines.push(`🎾 ${p.name.trim()} (${p.status})`);
+            } else {
+                 lines.push(`🎾`);
+            }
+        });
+
+        for (let i = 0; i < spotsLeft; i++) {
+          lines.push(`🎾`);
+        }
+
+        return lines.join('\n');
+      };
+
+      const message = generateMessage();
+
+      const handleCopy = () => {
+        const textArea = document.createElement("textarea");
+        textArea.value = message;
+        document.body.appendChild(textArea);
+        textArea.select();
+        try {
+          document.execCommand('copy');
+          setCopied(true);
+          setTimeout(() => setCopied(false), 2000);
+        } catch (err) {
+          console.error('Kopieren fehlgeschlagen', err);
+        }
+        document.body.removeChild(textArea);
+      };
+
+      const t = theme === 'FCG' ? {
+        bg: 'linear-gradient(135deg, #004b87 0%, #002847 100%)',
+        border: '#009543',
+        headerBg: '#009543',
+        headerText: '#ffffff',
+        headerSub: '#cbf4d9',
+        title: 'FCG Padel',
+        subtitle: 'Der letzte Cowboy kommt aus Gütersloh!',
+        label: '#004b87',
+        focus: '#009543',
+        btnActiveBg: '#004b87',
+        btnActiveText: '#ffffff',
+        statusM_bg: '#009543',
+        statusM_text: '#ffffff',
+        statusG_bg: '#004b87',
+        statusG_text: '#ffffff',
+        copyBg: '#004b87',
+        copyText: '#ffffff',
+        copyHover: '#003d6e',
+        copySuccessBg: '#009543',
+        copySuccessText: '#ffffff'
+      } : {
+        bg: 'linear-gradient(135deg, #18181b 0%, #000000 100%)',
+        border: '#FDE100',
+        headerBg: '#FDE100',
+        headerText: '#000000',
+        headerSub: '#4a4a4a',
+        title: 'BVB Padel',
+        subtitle: 'Echte Liebe auf dem Court!',
+        label: '#000000',
+        focus: '#FDE100',
+        btnActiveBg: '#000000',
+        btnActiveText: '#FDE100',
+        statusM_bg: '#000000',
+        statusM_text: '#FDE100',
+        statusG_bg: '#FDE100',
+        statusG_text: '#000000',
+        copyBg: '#FDE100',
+        copyText: '#000000',
+        copyHover: '#e6cc00',
+        copySuccessBg: '#000000',
+        copySuccessText: '#FDE100'
+      };
+
+      return (
+        <div className="min-h-screen font-sans p-4 pt-20 md:p-8 flex items-start justify-center relative transition-all duration-500" 
+             style={{ background: t.bg }}>
+          
+          <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-40 flex bg-black/40 backdrop-blur-md rounded-full p-1 border border-white/20 shadow-lg">
+            <button 
+              onClick={() => setTheme('FCG')} 
+              className="px-4 py-1.5 text-sm font-bold rounded-full transition-all duration-300"
+              style={{
+                backgroundColor: theme === 'FCG' ? '#009543' : 'transparent',
+                color: theme === 'FCG' ? '#ffffff' : 'rgba(255,255,255,0.7)',
+                boxShadow: theme === 'FCG' ? '0 2px 10px rgba(0,149,67,0.4)' : 'none'
+              }}
+            >
+              FCG
+            </button>
+            <button 
+              onClick={() => setTheme('BVB')} 
+              className="px-4 py-1.5 text-sm font-bold rounded-full transition-all duration-300"
+              style={{
+                backgroundColor: theme === 'BVB' ? '#FDE100' : 'transparent',
+                color: theme === 'BVB' ? '#000000' : 'rgba(255,255,255,0.7)',
+                boxShadow: theme === 'BVB' ? '0 2px 10px rgba(253,225,0,0.4)' : 'none'
+              }}
+            >
+              BVB
+            </button>
+          </div>
+
+          <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden border-4 transition-colors duration-500 z-10"
+               style={{ borderColor: t.border }}>
+            
+            <div className="p-6 pb-5 text-center relative overflow-hidden transition-colors duration-500" style={{ backgroundColor: t.headerBg }}>
+              <div className="absolute inset-0 opacity-10" 
+                   style={{ backgroundImage: 'repeating-linear-gradient(45deg, #000 0, #000 2px, transparent 2px, transparent 10px)' }}>
+              </div>
+              <div className="relative z-10">
+                {theme === 'FCG' ? <CowboyLogo /> : <BVBLogo />}
+                <h1 className="text-3xl font-extrabold tracking-tight uppercase drop-shadow-sm transition-colors duration-500" style={{ color: t.headerText }}>
+                  {t.title}
+                </h1>
+                <p className="text-sm mt-1 font-bold tracking-wide transition-colors duration-500" style={{ color: t.headerSub }}>
+                  {t.subtitle}
+                </p>
+              </div>
+            </div>
+
+            <div className="p-5 space-y-5 bg-slate-50 relative">
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider mb-2 transition-colors duration-500" style={{ color: t.label }}>
+                    <IconCalendar /> Datum
+                  </label>
+                  <input
+                    type="date"
+                    value={date}
+                    onChange={(e) => setDate(e.target.value)}
+                    className="w-full bg-white border-2 border-slate-200 rounded-xl px-4 py-3 text-slate-800 outline-none transition-all font-medium shadow-sm"
+                    onFocus={(e) => e.target.style.borderColor = t.focus}
+                    onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+                  />
+                </div>
+
+                <div>
+                  <label className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider mb-2 transition-colors duration-500" style={{ color: t.label }}>
+                    <IconClock /> Uhrzeit
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="time"
+                      value={timeFrom}
+                      onChange={(e) => setTimeFrom(e.target.value)}
+                      className="flex-1 bg-white border-2 border-slate-200 rounded-xl px-4 py-3 text-slate-800 outline-none transition-all font-medium shadow-sm"
+                      onFocus={(e) => e.target.style.borderColor = t.focus}
+                      onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+                    />
+                    <span className="font-bold transition-colors duration-500" style={{ color: t.label }}>–</span>
+                    <input
+                      type="time"
+                      value={timeTo}
+                      onChange={(e) => setTimeTo(e.target.value)}
+                      className="flex-1 bg-white border-2 border-slate-200 rounded-xl px-4 py-3 text-slate-800 outline-none transition-all font-medium shadow-sm"
+                      onFocus={(e) => e.target.style.borderColor = t.focus}
+                      onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider transition-colors duration-500" style={{ color: t.label }}>
+                    <IconTag /> Kategorie
+                  </label>
+                  <button 
+                    onClick={() => setActiveInfo('category')}
+                    className="p-1 rounded-full hover:bg-slate-200 transition-colors flex items-center justify-center"
+                    style={{ color: t.label }}
+                  >
+                    <IconInfo />
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {CATEGORIES.map(cat => {
+                    const isActive = category === cat;
+                    return (
+                      <button
+                        key={cat}
+                        onClick={() => setCategory(cat)}
+                        className="flex-1 py-2 px-3 rounded-lg text-lg font-black transition-all border-2"
+                        style={{
+                          backgroundColor: isActive ? t.btnActiveBg : '#ffffff',
+                          color: isActive ? t.btnActiveText : '#475569',
+                          borderColor: isActive ? t.btnActiveBg : '#e2e8f0',
+                          boxShadow: isActive ? `0 4px 6px -1px rgba(0,0,0,0.1)` : 'none'
+                        }}
+                      >
+                        {cat}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <label className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider mb-2 transition-colors duration-500" style={{ color: t.label }}>
+                  <IconGlobe /> Buchungslink
+                </label>
+                <input
+                  type="url"
+                  placeholder="https://..."
+                  value={bookingLink}
+                  onChange={(e) => setBookingLink(e.target.value)}
+                  className="w-full bg-white border-2 border-slate-200 rounded-xl px-4 py-3 text-slate-800 outline-none transition-all font-medium shadow-sm"
+                  onFocus={(e) => e.target.style.borderColor = t.focus}
+                  onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+                />
+              </div>
+
+              <div className="pt-2 border-t border-slate-200">
+                <div className="flex justify-between items-center mb-3">
+                  <label className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider transition-colors duration-500" style={{ color: t.label }}>
+                    <IconUsers /> Spieler ({players.length}/{MAX_PLAYERS})
+                  </label>
+                  {players.length < MAX_PLAYERS && (
+                    <button 
+                      onClick={addPlayer}
+                      className="text-xs font-bold flex items-center gap-1 transition-colors px-2 py-1 rounded-md"
+                      style={{ color: t.focus, backgroundColor: `${t.focus}15` }}
+                    >
+                      <IconPlus /> Hinzufügen
+                    </button>
+                  )}
+                </div>
+                
+                <div className="space-y-3">
+                  {players.map((p, index) => (
+                    <div key={index} className="flex gap-2 items-center">
+                      <div className="flex-1 flex gap-2">
+                        <input
+                          type="text"
+                          placeholder={`Spieler ${index + 1}`}
+                          value={p.name}
+                          onChange={(e) => updatePlayerName(index, e.target.value)}
+                          className="w-full bg-white border-2 border-slate-200 rounded-xl px-3 py-2.5 text-slate-800 outline-none transition-all font-medium shadow-sm"
+                          onFocus={(e) => e.target.style.borderColor = t.focus}
+                          onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+                        />
+                        
+                        <button
+                          onClick={() => togglePlayerStatus(index)}
+                          className="w-14 rounded-xl px-0 py-2.5 text-center font-black transition-all shadow-sm border-2"
+                          style={{
+                            backgroundColor: p.status === 'M' ? t.statusM_bg : t.statusG_bg,
+                            color: p.status === 'M' ? t.statusM_text : t.statusG_text,
+                            borderColor: p.status === 'M' ? t.statusM_bg : t.statusG_bg,
+                          }}
+                        >
+                          {p.status}
+                        </button>
+                      </div>
+
+                      {players.length > 1 && (
+                        <button 
+                          onClick={() => removePlayer(index)}
+                          className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                        >
+                          <IconTrash />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+
+                  <div className="flex justify-end items-center gap-1 mt-1">
+                    <p className="text-[10px] text-slate-500 font-medium">
+                      *Tippe auf M/G um den Status zu wechseln
+                    </p>
+                    <button 
+                      onClick={() => setActiveInfo('status')}
+                      className="p-1 rounded-full hover:bg-slate-200 transition-colors flex items-center justify-center"
+                      style={{ color: t.label }}
+                    >
+                      <IconInfo />
+                    </button>
+                  </div>
+
+                  {spotsLeft > 0 && Array.from({ length: spotsLeft }).map((_, i) => (
+                    <div key={`empty-${i}`} className="flex items-center gap-3 px-3 py-3 border-2 border-dashed border-slate-300 rounded-xl bg-slate-100/50">
+                       <span className="text-slate-500 text-sm font-medium italic">🎾 Freier Platz</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-6">
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
+                  Vorschau
+                </label>
+                <div className="bg-[#f8fafc] p-4 rounded-xl border border-slate-200 text-sm text-slate-700 font-mono whitespace-pre-wrap leading-relaxed shadow-inner overflow-x-auto">
+                  {message}
+                </div>
+              </div>
+
+              <button
+                onClick={handleCopy}
+                className="w-full py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-2 transition-all transform hover:scale-[1.02] active:scale-95 shadow-lg mt-2"
+                style={{
+                  backgroundColor: copied ? t.copySuccessBg : t.copyBg,
+                  color: copied ? t.copySuccessText : t.copyText,
+                }}
+              >
+                {copied ? (
+                  <>
+                    <IconCheck /> Kopiert!
+                  </>
+                ) : (
+                  <>
+                    <IconCopy /> Text kopieren
+                  </>
+                )}
+              </button>
+
+            </div>
+          </div>
+
+          {activeInfo && (
+            <div 
+              className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+              onClick={() => setActiveInfo(null)}
+            >
+              <div 
+                className="bg-white rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden transition-transform duration-200"
+                onClick={(e) => e.stopPropagation()}
+                style={{ border: `3px solid ${t.headerBg}` }}
+              >
+                <div className="flex justify-between items-center p-4 text-white" style={{ backgroundColor: t.headerBg }}>
+                  <h3 className="font-bold text-lg flex items-center gap-2" style={{ color: t.headerText }}>
+                    <IconInfo size={20} />
+                    {activeInfo === 'category' ? 'Kategorien' : 'Spielerstatus'}
+                  </h3>
+                  <button onClick={() => setActiveInfo(null)} className="p-1 hover:bg-black/10 rounded-full transition-colors flex items-center justify-center" style={{ color: t.headerText }}>
+                    <IconX />
+                  </button>
+                </div>
+                
+                <div className="p-5 text-slate-700 text-sm space-y-4">
+                  {activeInfo === 'category' && (
+                    <>
+                      <p>Die Kategorien helfen dabei, Spiele auf Augenhöhe zu finden:</p>
+                      <ul className="space-y-3">
+                        <li><strong style={{ color: t.label }}>Kat 1 (Anfänger):</strong> Erste Erfahrungen auf dem Court. Du lernst noch die Grundregeln.</li>
+                        <li><strong style={{ color: t.label }}>Kat 2 (Fortgeschritten):</strong> Du triffst den Ball sicher und baust erste Ballwechsel auf.</li>
+                        <li><strong style={{ color: t.label }}>Kat 3 (Mittelstufe):</strong> Gutes Ballgefühl. Du nutzt Glaswände regelmäßig.</li>
+                        <li><strong style={{ color: t.label }}>Kat 4 (Profis):</strong> Sehr hohes Niveau, taktisches Verständnis, schnelles Spiel am Netz.</li>
+                      </ul>
+                    </>
+                  )}
+
+                  {activeInfo === 'status' && (
+                    <>
+                      <p>Wichtig für die Abrechnung der Platzkosten:</p>
+                      <div className="space-y-3 mt-3">
+                        <div className="flex gap-3">
+                          <span className="font-black px-2 py-1 rounded text-white flex-shrink-0" style={{ backgroundColor: t.statusM_bg, color: t.statusM_text }}>M</span>
+                          <div>
+                            <strong>Mitglied</strong><br/>
+                            Aktives Vereinsmitglied. Platzmiete meist über Beitrag abgegolten.
+                          </div>
+                        </div>
+                        <div className="flex gap-3">
+                          <span className="font-black px-2 py-1 rounded text-white flex-shrink-0" style={{ backgroundColor: t.statusG_bg, color: t.statusG_text }}>G</span>
+                          <div>
+                            <strong>Gast</strong><br/>
+                            Kein Mitglied. Für Gastspieler fällt anteilig eine Platzgebühr an.
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+                <div className="p-4 bg-slate-50 border-t border-slate-100 text-center">
+                  <button 
+                    onClick={() => setActiveInfo(null)}
+                    className="w-full py-2.5 rounded-lg font-bold transition-all hover:opacity-90 shadow-sm"
+                    style={{ backgroundColor: t.headerBg, color: t.headerText }}
+                  >
+                    Verstanden
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
+
